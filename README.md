@@ -96,6 +96,14 @@ Copy the sample configuration file and keep the defaults for a standalone setup:
 cp /opt/zookeeper/conf/zoo_sample.cfg /opt/zookeeper/conf/zoo.cfg
 ```
 
+The default configuration sets `dataDir=/tmp/zookeeper`. Create that directory so ZooKeeper can write its data files — **this is the most common cause of the `FAILED TO START` error**:
+
+```bash
+sudo mkdir -p /tmp/zookeeper
+```
+
+> **Note:** For a production setup, replace `/tmp/zookeeper` with a persistent path (e.g. `/var/lib/zookeeper`) and update the `dataDir` line in `zoo.cfg` to match, then create that directory instead.
+
 ### 4. Configure Environment Variables
 
 Add the following lines to your shell configuration file:
@@ -138,6 +146,60 @@ Expected output includes `Mode: standalone`. To stop ZooKeeper:
 ```bash
 zkServer.sh stop
 ```
+
+### Troubleshooting: `FAILED TO START`
+
+If `zkServer.sh start` prints `Starting zookeeper ... FAILED TO START`, work through the following checks in order.
+
+#### 1. Check the ZooKeeper log
+
+The log file is written to the directory where you ran `zkServer.sh`. Read it for the root cause:
+
+```bash
+cat zookeeper.out
+```
+
+#### 2. `dataDir` does not exist (most common cause)
+
+Open `zoo.cfg` and note the value of `dataDir`:
+
+```bash
+grep dataDir /opt/zookeeper/conf/zoo.cfg
+```
+
+Create that directory if it is missing:
+
+```bash
+# Default dataDir used by zoo_sample.cfg:
+sudo mkdir -p /tmp/zookeeper
+
+# If you customized dataDir, replace the path below:
+# sudo mkdir -p /var/lib/zookeeper
+```
+
+Then retry `zkServer.sh start`.
+
+#### 3. Port 2181 is already in use
+
+Check whether another process is already listening on the default client port:
+
+```bash
+sudo lsof -i :2181
+# or
+sudo ss -tlnp | grep 2181
+```
+
+If a process is listed, either stop it or change the `clientPort` in `zoo.cfg` to a free port (e.g. `clientPort=2182`).
+
+#### 4. Java not found
+
+ZooKeeper requires Java 8 or later. Verify it is installed and on your `PATH`:
+
+```bash
+java -version
+```
+
+If the command is not found, install Java (e.g. `sudo apt install default-jdk` on Debian/Ubuntu or `brew install openjdk` on macOS) and ensure `JAVA_HOME` is set correctly.
 
 ---
 
