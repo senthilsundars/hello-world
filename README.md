@@ -62,7 +62,7 @@ If you see `spark-shell: command not found`, ensure step 3 was completed and tha
 
 ---
 
-## Apache ZooKeeper 3.6.4 Download and Install
+## Apache ZooKeeper 3.9.5 Download and Install
 
 ### Prerequisites
 
@@ -77,7 +77,7 @@ java -version
 Run all of the following commands in the **same terminal session** so the `ZK_VER` variable is available to each command:
 
 ```bash
-ZK_VER=3.6.4
+ZK_VER=3.9.5
 wget https://dlcdn.apache.org/zookeeper/zookeeper-$ZK_VER/apache-zookeeper-$ZK_VER-bin.tar.gz
 ```
 
@@ -85,7 +85,8 @@ wget https://dlcdn.apache.org/zookeeper/zookeeper-$ZK_VER/apache-zookeeper-$ZK_V
 
 ```bash
 tar xzf apache-zookeeper-$ZK_VER-bin.tar.gz
-sudo mv apache-zookeeper-$ZK_VER-bin /opt/zookeeper
+sudo mkdir -p /usr/local/zookeeper
+sudo mv apache-zookeeper-$ZK_VER-bin /usr/local/zookeeper/apache-zookeeper-$ZK_VER-bin
 ```
 
 ### 3. Configure
@@ -93,7 +94,8 @@ sudo mv apache-zookeeper-$ZK_VER-bin /opt/zookeeper
 Copy the sample configuration file and keep the defaults for a standalone setup:
 
 ```bash
-cp /opt/zookeeper/conf/zoo_sample.cfg /opt/zookeeper/conf/zoo.cfg
+cp /usr/local/zookeeper/apache-zookeeper-$ZK_VER-bin/conf/zoo_sample.cfg \
+   /usr/local/zookeeper/apache-zookeeper-$ZK_VER-bin/conf/zoo.cfg
 ```
 
 The default configuration sets `dataDir=/tmp/zookeeper`. Create that directory so ZooKeeper can write its data files — **this is the most common cause of the `FAILED TO START` error**:
@@ -111,7 +113,8 @@ Add the following lines to your shell configuration file:
 - **zsh** users (default on macOS): `~/.zshrc`
 
 ```bash
-export ZOOKEEPER_HOME=/opt/zookeeper
+ZK_VER=3.9.5
+export ZOOKEEPER_HOME=/usr/local/zookeeper/apache-zookeeper-$ZK_VER-bin
 export PATH=$PATH:$ZOOKEEPER_HOME/bin
 ```
 
@@ -153,10 +156,10 @@ If `zkServer.sh start` prints `Starting zookeeper ... FAILED TO START`, work thr
 
 #### 1. Check the ZooKeeper log
 
-The log file is written to the directory where you ran `zkServer.sh`. Read it for the root cause:
+The log file is named `zookeeper-<user>-server-<hostname>.out` and is written to the directory where you ran `zkServer.sh`. Read it for the root cause:
 
 ```bash
-cat zookeeper.out
+cat zookeeper-*-server-*.out
 ```
 
 #### 2. `dataDir` does not exist (most common cause)
@@ -164,7 +167,7 @@ cat zookeeper.out
 Open `zoo.cfg` and note the value of `dataDir`:
 
 ```bash
-grep dataDir /opt/zookeeper/conf/zoo.cfg
+grep dataDir $ZOOKEEPER_HOME/conf/zoo.cfg
 ```
 
 Create that directory if it is missing:
