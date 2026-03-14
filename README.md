@@ -13,6 +13,8 @@ java -version
 
 ### 1. Download
 
+Run all of the following commands in the **same terminal session** so the `VER` variable is available to each command:
+
 ```bash
 VER=4.1.1
 wget https://dlcdn.apache.org/spark/spark-$VER/spark-$VER-bin-hadoop3.tgz
@@ -27,21 +29,33 @@ sudo mv spark-$VER-bin-hadoop3 /opt/spark
 
 ### 3. Configure Environment Variables
 
-Add the following lines to your `~/.bashrc` (or `~/.zshrc`):
+Add the following lines to your shell configuration file:
+- **bash** users: `~/.bashrc`
+- **zsh** users (default on macOS): `~/.zshrc`
 
 ```bash
 export SPARK_HOME=/opt/spark
 export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin
 ```
 
-Then reload your shell configuration:
+Then reload your shell configuration. For **bash**:
 
 ```bash
 source ~/.bashrc
 ```
+
+For **zsh**:
+
+```bash
+source ~/.zshrc
+```
+
+> **Tip:** Alternatively, simply open a new terminal window — the variables will be loaded automatically.
 
 ### 4. Verify Installation
 
 ```bash
 spark-shell --version
 ```
+
+If you see `spark-shell: command not found`, ensure step 3 was completed and that you have sourced (or reopened) your shell configuration.
