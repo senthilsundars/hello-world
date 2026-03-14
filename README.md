@@ -194,7 +194,30 @@ sudo ss -tlnp | grep 2181
 
 If a process is listed, either stop it or change the `clientPort` in `zoo.cfg` to a free port (e.g. `clientPort=2182`).
 
-#### 4. Java not found
+#### 4. AdminServer port 8080 is already in use
+
+ZooKeeper 3.5+ starts a built-in AdminServer (Jetty) on port **8080** by default. If port 8080 is taken you will see this in the log:
+
+```
+ERROR Unable to start AdminServer, exiting abnormally
+Caused by: java.net.BindException: Address already in use
+```
+
+**Option A — change the AdminServer port** (e.g. to 9090):
+
+```bash
+echo "admin.serverPort=9090" >> $ZOOKEEPER_HOME/conf/zoo.cfg
+```
+
+**Option B — disable the AdminServer entirely**:
+
+```bash
+echo "admin.enableServer=false" >> $ZOOKEEPER_HOME/conf/zoo.cfg
+```
+
+Then retry `zkServer.sh start`.
+
+#### 5. Java not found
 
 ZooKeeper requires Java 8 or later. Verify it is installed and on your `PATH`:
 
