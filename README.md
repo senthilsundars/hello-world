@@ -5,7 +5,7 @@ This repository is for practicing the GitHub Flow.
 
 ### Prerequisites
 
-- Java 8 or later (Java 17 recommended for Spark 4.x)
+- Java 17 or later (required for Spark 4.1+)
 
 ```bash
 java -version
@@ -14,7 +14,7 @@ java -version
 ### 1. Download
 
 ```bash
-VER=4.1.0
+VER=4.1.1
 wget https://dlcdn.apache.org/spark/spark-$VER/spark-$VER-bin-hadoop3.tgz
 ```
 
