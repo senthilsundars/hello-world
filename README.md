@@ -340,10 +340,12 @@ KAFKA_CLUSTER_ID=$(kafka-storage.sh random-uuid)
 **Step 2 — format the storage directory:**
 
 ```bash
-kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c $KAFKA_HOME/config/kraft/server.properties
+kafka-storage.sh format --standalone -t $KAFKA_CLUSTER_ID -c $KAFKA_HOME/config/kraft/server.properties
 ```
 
-> **Note:** Use the `kraft/server.properties` file (inside the `config/kraft/` sub-directory), not the top-level `config/server.properties`, when running in KRaft mode.
+> **Notes:**
+> - Use the `kraft/server.properties` file (inside the `config/kraft/` sub-directory), not the top-level `config/server.properties`, when running in KRaft mode.
+> - The `--standalone` flag is required on Kafka 3.8+ for single-node setups where `controller.quorum.voters` is not pre-configured in the properties file. See entry 2 below if you encounter the related error.
 
 **Step 3 — start the broker:**
 
@@ -353,7 +355,37 @@ kafka-server-start.sh $KAFKA_HOME/config/kraft/server.properties
 
 The storage directory only needs to be formatted **once**. Re-formatting an existing directory will erase all stored data.
 
-#### 2. Port 9092 is already in use
+#### 2. `controller.quorum.voters is not set` during `kafka-storage.sh format`
+
+Kafka 3.8+ requires you to declare the initial quorum configuration at format time when `controller.quorum.voters` is absent from `server.properties`. Without it you will see:
+
+```
+Because controller.quorum.voters is not set on this controller, you must specify
+one of the following: --standalone, --initial-controllers, or --no-initial-controllers.
+```
+
+Choose the flag that matches your deployment:
+
+| Flag | When to use |
+|------|-------------|
+| `--standalone` | **Single-node** (combined broker + controller). Most common for development and single-machine installs. |
+| `--initial-controllers <spec>` | **Multi-node cluster** where you want to explicitly list the initial controller endpoints. |
+| `--no-initial-controllers` | You will supply controller configuration separately (advanced / scripted setups). |
+
+For a typical single-node install, add `--standalone`:
+
+```bash
+kafka-storage.sh format --standalone -t $KAFKA_CLUSTER_ID -c $KAFKA_HOME/config/kraft/server.properties
+```
+
+Alternatively, add `controller.quorum.voters` directly to `kraft/server.properties` to avoid needing this flag:
+
+```properties
+# Example for a single-node cluster with node.id=1 listening on port 9093
+controller.quorum.voters=1@localhost:9093
+```
+
+#### 3. Port 9092 is already in use
 
 Check whether another process is listening on the default broker port:
 
