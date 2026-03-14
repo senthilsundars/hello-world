@@ -317,3 +317,50 @@ zkServer.sh stop
 # If using bundled ZooKeeper:
 zookeeper-server-stop.sh
 ```
+
+---
+
+### Troubleshooting: Kafka startup errors
+
+#### 1. `No readable meta.properties files found` (KRaft mode)
+
+When Kafka is configured to run in **KRaft mode** (without ZooKeeper, using `server.properties` with a `process.roles` setting), the log directory must be formatted before the broker is started for the first time. If you skip this step you will see:
+
+```
+ERROR Exiting Kafka due to fatal exception (kafka.Kafka$)
+java.lang.RuntimeException: No readable meta.properties files found.
+```
+
+**Step 1 — generate a cluster UUID:**
+
+```bash
+KAFKA_CLUSTER_ID=$(kafka-storage.sh random-uuid)
+```
+
+**Step 2 — format the storage directory:**
+
+```bash
+kafka-storage.sh format -t $KAFKA_CLUSTER_ID -c $KAFKA_HOME/config/kraft/server.properties
+```
+
+> **Note:** Use the `kraft/server.properties` file (inside the `config/kraft/` sub-directory), not the top-level `config/server.properties`, when running in KRaft mode.
+
+**Step 3 — start the broker:**
+
+```bash
+kafka-server-start.sh $KAFKA_HOME/config/kraft/server.properties
+```
+
+The storage directory only needs to be formatted **once**. Re-formatting an existing directory will erase all stored data.
+
+#### 2. Port 9092 is already in use
+
+Check whether another process is listening on the default broker port:
+
+```bash
+sudo lsof -i :9092
+# or
+sudo ss -tlnp | grep 9092
+```
+
+If a process is listed, either stop it or change `listeners` in `server.properties` to a free port (e.g. `listeners=PLAINTEXT://:9093`).
