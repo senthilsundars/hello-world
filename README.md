@@ -70,11 +70,28 @@ java.net.ConnectException: Connection refused (state=08S01,code=0)
 
 **Run HiveServer2 as a foreground process for debugging:**
 
+Using the `hive` wrapper:
+
 ```bash
 hive --service hiveserver2 --hiveconf hive.root.logger=INFO,console
 ```
 
-This prints all log messages to stdout, making it easier to spot configuration or startup errors.
+Or using the `hiveserver2` binary directly (useful when you need fine-grained control over port and impersonation settings):
+
+```bash
+hiveserver2 \
+  --hiveconf hive.server2.thrift.port=10000 \
+  --hiveconf hive.root.logger=INFO,console \
+  --hiveconf hive.server2.enable.doAs=false
+```
+
+| Flag | Purpose |
+|---|---|
+| `hive.server2.thrift.port=10000` | Explicitly set the Thrift port (default is already 10000; override if another port is needed) |
+| `hive.root.logger=INFO,console` | Print all log output to stdout for easy debugging |
+| `hive.server2.enable.doAs=false` | Disable user impersonation — recommended for single-user development/test environments |
+
+Both commands print all log messages to stdout, making it easier to spot configuration or startup errors.
 
 ---
 
@@ -108,8 +125,18 @@ If port 10000 is not yet listed, wait a moment and try again.
 # Stop the running instance — replace <PID> with the number shown in the message
 kill <PID>
 
-# Wait a few seconds, then start HS2 again
+# Wait a few seconds, then start HS2 again.
+# Use whichever form you originally used.
+# Omit '&' to run in the foreground and watch startup logs directly.
+
+# Option A — via the hive wrapper
 hive --service hiveserver2 &
+
+# Option B — via the hiveserver2 binary directly
+hiveserver2 \
+  --hiveconf hive.server2.thrift.port=10000 \
+  --hiveconf hive.root.logger=INFO,console \
+  --hiveconf hive.server2.enable.doAs=false &
 ```
 
 Alternatively, if your Hive installation provides a stop script:
