@@ -29,6 +29,18 @@ def normalize_country_code(country_code: str) -> str:
     return country_code.strip().upper()
 
 
+def normalize_currency(currency: str) -> str:
+    return currency.strip().upper()
+
+
+def normalize_channel(channel: str) -> str:
+    return channel.strip().lower()
+
+
+def normalize_risk_label(risk_label: str) -> str:
+    return risk_label.strip().lower()
+
+
 @dataclass
 class Customer:
     customer_id: str
@@ -85,7 +97,7 @@ class AMLRulesEngine:
         return Decision(outcome=outcome, total_score=total_score, alerts=alerts)
 
     def _uses_threshold_currency(self, tx: Transaction) -> bool:
-        return tx.currency == THRESHOLD_CURRENCY
+        return normalize_currency(tx.currency) == THRESHOLD_CURRENCY
 
     def _check_sanctions(self, tx: Transaction) -> List[Alert]:
         if normalize_name(tx.counterparty_name) in SANCTIONED_NAMES:
@@ -112,7 +124,7 @@ class AMLRulesEngine:
                 )
             )
 
-        if customer.onboarding_risk == "high":
+        if normalize_risk_label(customer.onboarding_risk) == "high":
             alerts.append(
                 Alert(
                     code="HIGH_ONBOARDING_RISK",
@@ -174,8 +186,9 @@ class AMLRulesEngine:
 
     def _check_large_transactions(self, tx: Transaction) -> List[Alert]:
         alerts = []
+        normalized_channel = normalize_channel(tx.channel)
 
-        if self._uses_threshold_currency(tx) and tx.channel == "cash" and tx.amount >= LARGE_CASH_THRESHOLD:
+        if self._uses_threshold_currency(tx) and normalized_channel == "cash" and tx.amount >= LARGE_CASH_THRESHOLD:
             alerts.append(
                 Alert(
                     code="LARGE_CASH_TX",
@@ -185,7 +198,7 @@ class AMLRulesEngine:
                 )
             )
 
-        if self._uses_threshold_currency(tx) and tx.channel == "wire" and tx.amount >= HIGH_VALUE_WIRE_THRESHOLD:
+        if self._uses_threshold_currency(tx) and normalized_channel == "wire" and tx.amount >= HIGH_VALUE_WIRE_THRESHOLD:
             alerts.append(
                 Alert(
                     code="HIGH_VALUE_WIRE",
@@ -206,7 +219,7 @@ class AMLRulesEngine:
             prior_tx
             for prior_tx in self.tx_history.get(tx.customer_id, [])
             if one_day_ago <= prior_tx.timestamp < tx.timestamp
-            and prior_tx.currency == tx.currency
+            and normalize_currency(prior_tx.currency) == normalize_currency(tx.currency)
         ]
 
         total_24h = sum(prior_tx.amount for prior_tx in recent) + tx.amount
@@ -236,7 +249,7 @@ class AMLRulesEngine:
         return alerts
 
     def _check_structuring(self, tx: Transaction) -> List[Alert]:
-        if tx.channel != "cash" or not self._uses_threshold_currency(tx):
+        if normalize_channel(tx.channel) != "cash" or not self._uses_threshold_currency(tx):
             return []
 
         one_day_ago = tx.timestamp - timedelta(days=1)
@@ -244,8 +257,8 @@ class AMLRulesEngine:
             prior_tx
             for prior_tx in self.tx_history.get(tx.customer_id, [])
             if one_day_ago <= prior_tx.timestamp < tx.timestamp
-            and prior_tx.channel == "cash"
-            and prior_tx.currency == tx.currency
+            and normalize_channel(prior_tx.channel) == "cash"
+            and normalize_currency(prior_tx.currency) == normalize_currency(tx.currency)
         ]
         prior_near_threshold = [
             prior_tx
