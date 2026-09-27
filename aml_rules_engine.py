@@ -137,6 +137,7 @@ class AMLRulesEngine:
     def _check_geography(self, customer: Customer, tx: Transaction) -> List[Alert]:
         alerts = []
         customer_country_code = normalize_country_code(customer.country_code)
+        transaction_country_code = normalize_country_code(tx.country_code)
         counterparty_country_code = normalize_country_code(tx.counterparty_country)
 
         if customer_country_code in HIGH_RISK_COUNTRIES:
@@ -145,6 +146,16 @@ class AMLRulesEngine:
                     code="CUSTOMER_HIGH_RISK_GEO",
                     severity="high",
                     message=f"Customer linked to high-risk geography: {customer_country_code}",
+                    score=25,
+                )
+            )
+
+        if transaction_country_code in HIGH_RISK_COUNTRIES:
+            alerts.append(
+                Alert(
+                    code="TRANSACTION_HIGH_RISK_GEO",
+                    severity="high",
+                    message=f"Transaction linked to high-risk geography: {transaction_country_code}",
                     score=25,
                 )
             )
@@ -187,6 +198,9 @@ class AMLRulesEngine:
         return alerts
 
     def _check_velocity(self, tx: Transaction) -> List[Alert]:
+        if not self._uses_threshold_currency(tx):
+            return []
+
         one_day_ago = tx.timestamp - timedelta(days=1)
         recent = [
             prior_tx
@@ -263,6 +277,7 @@ class AMLRulesEngine:
 
 
 def build_sample_data() -> Tuple[Customer, Dict[str, List[Transaction]], Transaction]:
+    """Return illustrative sample data for running the rules engine locally."""
     customer = Customer(
         customer_id="C001",
         full_name="Alice Doe",
