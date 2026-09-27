@@ -25,6 +25,10 @@ def normalize_name(name: str) -> str:
     return normalized
 
 
+def normalize_country_code(country_code: str) -> str:
+    return country_code.strip().upper()
+
+
 @dataclass
 class Customer:
     customer_id: str
@@ -80,6 +84,9 @@ class AMLRulesEngine:
         outcome = self._decision(alerts, total_score)
         return Decision(outcome=outcome, total_score=total_score, alerts=alerts)
 
+    def _uses_threshold_currency(self, tx: Transaction) -> bool:
+        return tx.currency == THRESHOLD_CURRENCY
+
     def _check_sanctions(self, tx: Transaction) -> List[Alert]:
         if normalize_name(tx.counterparty_name) in SANCTIONED_NAMES:
             return [
@@ -129,23 +136,25 @@ class AMLRulesEngine:
 
     def _check_geography(self, customer: Customer, tx: Transaction) -> List[Alert]:
         alerts = []
+        customer_country_code = normalize_country_code(customer.country_code)
+        counterparty_country_code = normalize_country_code(tx.counterparty_country)
 
-        if customer.country_code in HIGH_RISK_COUNTRIES:
+        if customer_country_code in HIGH_RISK_COUNTRIES:
             alerts.append(
                 Alert(
                     code="CUSTOMER_HIGH_RISK_GEO",
                     severity="high",
-                    message=f"Customer linked to high-risk geography: {customer.country_code}",
+                    message=f"Customer linked to high-risk geography: {customer_country_code}",
                     score=25,
                 )
             )
 
-        if tx.counterparty_country in HIGH_RISK_COUNTRIES:
+        if counterparty_country_code in HIGH_RISK_COUNTRIES:
             alerts.append(
                 Alert(
                     code="COUNTERPARTY_HIGH_RISK_GEO",
                     severity="high",
-                    message=f"Counterparty linked to high-risk geography: {tx.counterparty_country}",
+                    message=f"Counterparty linked to high-risk geography: {counterparty_country_code}",
                     score=25,
                 )
             )
@@ -155,11 +164,7 @@ class AMLRulesEngine:
     def _check_large_transactions(self, tx: Transaction) -> List[Alert]:
         alerts = []
 
-        if (
-            tx.currency == THRESHOLD_CURRENCY
-            and tx.channel == "cash"
-            and tx.amount >= LARGE_CASH_THRESHOLD
-        ):
+        if self._uses_threshold_currency(tx) and tx.channel == "cash" and tx.amount >= LARGE_CASH_THRESHOLD:
             alerts.append(
                 Alert(
                     code="LARGE_CASH_TX",
@@ -169,11 +174,7 @@ class AMLRulesEngine:
                 )
             )
 
-        if (
-            tx.currency == THRESHOLD_CURRENCY
-            and tx.channel == "wire"
-            and tx.amount >= HIGH_VALUE_WIRE_THRESHOLD
-        ):
+        if self._uses_threshold_currency(tx) and tx.channel == "wire" and tx.amount >= HIGH_VALUE_WIRE_THRESHOLD:
             alerts.append(
                 Alert(
                     code="HIGH_VALUE_WIRE",
@@ -208,7 +209,7 @@ class AMLRulesEngine:
                 )
             )
 
-        if tx.currency == THRESHOLD_CURRENCY and total_24h >= HIGH_24H_VALUE_THRESHOLD:
+        if self._uses_threshold_currency(tx) and total_24h >= HIGH_24H_VALUE_THRESHOLD:
             alerts.append(
                 Alert(
                     code="TX_VELOCITY_VALUE",
