@@ -10,6 +10,8 @@ SANCTIONED_NAMES = {
     "blocked person",
     "shadow imports ltd",
 }
+# Demo simplification: amount-based threshold rules run only for transactions
+# explicitly denominated in USD. Other currencies are skipped instead of converted.
 THRESHOLD_CURRENCY = "USD"
 LARGE_CASH_THRESHOLD = 10_000
 HIGH_VALUE_WIRE_THRESHOLD = 50_000
@@ -97,6 +99,7 @@ class AMLRulesEngine:
         return Decision(outcome=outcome, total_score=total_score, alerts=alerts)
 
     def _uses_threshold_currency(self, tx: Transaction) -> bool:
+        """Return True when USD-only threshold rules should evaluate the transaction."""
         return normalize_currency(tx.currency) == THRESHOLD_CURRENCY
 
     def _check_sanctions(self, tx: Transaction) -> List[Alert]:
@@ -185,6 +188,7 @@ class AMLRulesEngine:
         return alerts
 
     def _check_large_transactions(self, tx: Transaction) -> List[Alert]:
+        """Apply USD-only large cash and high-value wire thresholds."""
         alerts = []
         normalized_channel = normalize_channel(tx.channel)
 
@@ -211,6 +215,7 @@ class AMLRulesEngine:
         return alerts
 
     def _check_velocity(self, tx: Transaction) -> List[Alert]:
+        """Apply USD-only 24-hour transaction velocity thresholds."""
         if not self._uses_threshold_currency(tx):
             return []
 
@@ -249,6 +254,7 @@ class AMLRulesEngine:
         return alerts
 
     def _check_structuring(self, tx: Transaction) -> List[Alert]:
+        """Apply USD-only structuring checks to cash transactions."""
         if normalize_channel(tx.channel) != "cash" or not self._uses_threshold_currency(tx):
             return []
 
