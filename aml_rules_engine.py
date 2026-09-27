@@ -10,6 +10,7 @@ SANCTIONED_NAMES = {
     "blocked person",
     "shadow imports ltd",
 }
+THRESHOLD_CURRENCY = "USD"
 LARGE_CASH_THRESHOLD = 10_000
 HIGH_VALUE_WIRE_THRESHOLD = 50_000
 HIGH_24H_VALUE_THRESHOLD = 100_000
@@ -154,7 +155,11 @@ class AMLRulesEngine:
     def _check_large_transactions(self, tx: Transaction) -> List[Alert]:
         alerts = []
 
-        if tx.channel == "cash" and tx.amount >= LARGE_CASH_THRESHOLD:
+        if (
+            tx.currency == THRESHOLD_CURRENCY
+            and tx.channel == "cash"
+            and tx.amount >= LARGE_CASH_THRESHOLD
+        ):
             alerts.append(
                 Alert(
                     code="LARGE_CASH_TX",
@@ -164,7 +169,11 @@ class AMLRulesEngine:
                 )
             )
 
-        if tx.channel == "wire" and tx.amount >= HIGH_VALUE_WIRE_THRESHOLD:
+        if (
+            tx.currency == THRESHOLD_CURRENCY
+            and tx.channel == "wire"
+            and tx.amount >= HIGH_VALUE_WIRE_THRESHOLD
+        ):
             alerts.append(
                 Alert(
                     code="HIGH_VALUE_WIRE",
@@ -182,6 +191,7 @@ class AMLRulesEngine:
             prior_tx
             for prior_tx in self.tx_history.get(tx.customer_id, [])
             if one_day_ago <= prior_tx.timestamp < tx.timestamp
+            and prior_tx.currency == tx.currency
         ]
 
         total_24h = sum(prior_tx.amount for prior_tx in recent) + tx.amount
@@ -198,7 +208,7 @@ class AMLRulesEngine:
                 )
             )
 
-        if total_24h >= HIGH_24H_VALUE_THRESHOLD:
+        if tx.currency == THRESHOLD_CURRENCY and total_24h >= HIGH_24H_VALUE_THRESHOLD:
             alerts.append(
                 Alert(
                     code="TX_VELOCITY_VALUE",
@@ -218,7 +228,9 @@ class AMLRulesEngine:
         recent_cash = [
             prior_tx
             for prior_tx in self.tx_history.get(tx.customer_id, [])
-            if one_day_ago <= prior_tx.timestamp < tx.timestamp and prior_tx.channel == "cash"
+            if one_day_ago <= prior_tx.timestamp < tx.timestamp
+            and prior_tx.channel == "cash"
+            and prior_tx.currency == tx.currency
         ]
         prior_near_threshold = [
             prior_tx
