@@ -241,7 +241,7 @@ class AMLRulesEngine:
                 )
             )
 
-        if self._uses_threshold_currency(tx) and total_24h >= HIGH_24H_VALUE_THRESHOLD:
+        if total_24h >= HIGH_24H_VALUE_THRESHOLD:
             alerts.append(
                 Alert(
                     code="TX_VELOCITY_VALUE",
