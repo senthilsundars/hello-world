@@ -137,7 +137,7 @@ class AMLRulesEngine:
                 )
             )
 
-        if customer.industry.lower() in {"casino", "crypto exchange", "money services business"}:
+        if customer.industry.strip().lower() in {"casino", "crypto exchange", "money services business"}:
             alerts.append(
                 Alert(
                     code="HIGH_RISK_INDUSTRY",
