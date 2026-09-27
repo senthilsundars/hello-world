@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import re
 
 
@@ -222,7 +222,7 @@ class AMLRulesEngine:
         return alerts
 
     def _check_structuring(self, tx: Transaction) -> List[Alert]:
-        if tx.channel != "cash":
+        if tx.channel != "cash" or not self._uses_threshold_currency(tx):
             return []
 
         one_day_ago = tx.timestamp - timedelta(days=1)
@@ -262,7 +262,7 @@ class AMLRulesEngine:
         return "APPROVE"
 
 
-def build_sample_data() -> tuple[Customer, Dict[str, List[Transaction]], Transaction]:
+def build_sample_data() -> Tuple[Customer, Dict[str, List[Transaction]], Transaction]:
     customer = Customer(
         customer_id="C001",
         full_name="Alice Doe",
