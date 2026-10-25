@@ -118,6 +118,9 @@ class Service:
             "monthly_rent": parse_amount(data.get("monthly_rent"), "Monthly rent", allow_zero=False),
             "deposit": parse_amount(data.get("deposit") or "0", "Advance/deposit"),
         }
+        for col in ("company_name", "company_address"):
+            if col in data or not resident_id:
+                clean[col] = (data.get(col) or "").strip()
         room_id = data.get("room_id")
         if not room_id:
             raise ValidationError("Please assign a room.")

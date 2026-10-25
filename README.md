@@ -27,7 +27,7 @@ button in the main window. If you forget it, move `hostel.db` out of the data fo
 - **Dashboard**: total rooms/beds, occupied/vacant beds, this-month collection, outstanding rent, open maintenance.
 - **Rooms & Beds**: 30 seeded rooms (101-130, 3 beds each); add/edit/delete rooms and capacities; occupancy view.
 - **Residents**: add, edit, check out; name, phone, address, ID proof, emergency contact, join date, rent,
-  deposit, room/bed. Only free beds are selectable and occupied beds are rejected.
+  deposit, optional working/company name and address, room/bed. Only free beds are selectable and occupied beds are rejected.
 - **Rent**: record payments (month, amount, date, Cash/UPI/Bank), automatic receipt numbers (RCPT-00001...),
   outstanding rent = (months from join month to current month) x monthly rent - total paid.
 - **Maintenance**, **Expenses**, **Visitors**: registers with the fields requested; statuses Open/In Progress/Completed.

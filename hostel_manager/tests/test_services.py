@@ -58,6 +58,33 @@ class ServiceTests(unittest.TestCase):
         self.s.save_resident(resident(name="New"))
         self.assertEqual(self.s.dashboard()["occupied_beds"], 1)
 
+    def test_company_details_optional_and_editable(self):
+        self.s.save_resident(resident())
+        r = self.s.list_residents()[0]
+        self.assertEqual((r["company_name"], r["company_address"]), ("", ""))
+        self.s.save_resident(resident(company_name="  Acme Ltd ", company_address=" 1 Main St "), r["id"])
+        r = self.s.get_resident(r["id"])
+        self.assertEqual((r["company_name"], r["company_address"]), ("Acme Ltd", "1 Main St"))
+        self.s.save_resident(resident(name="Ravi K"), r["id"])  # omitted keys are preserved
+        self.assertEqual(self.s.get_resident(r["id"])["company_name"], "Acme Ltd")
+        self.s.save_resident(resident(company_name="", company_address=""), r["id"])
+        self.assertEqual(self.s.get_resident(r["id"])["company_address"], "")
+
+    def test_migration_adds_company_columns(self):
+        path = Path(self.tmp.name) / "old.db"
+        old = db.connect(path)
+        old.executescript(db.SCHEMA.replace(
+            ",\n    company_name TEXT NOT NULL DEFAULT '', company_address TEXT NOT NULL DEFAULT ''", ""))
+        old.execute("INSERT INTO rooms(room_no, capacity) VALUES ('1', 3)")
+        old.execute("INSERT INTO residents(name, phone, address, id_proof_type, id_proof_number, emergency_name,"
+                    " emergency_phone, join_date, monthly_rent, room_id, bed_no) VALUES"
+                    " ('Old','9876543210','x','Aadhaar','1','m','9123456780','2024-01-01',1000,1,1)")
+        old.commit()
+        db.init_db(old)
+        row = Service(old).list_residents()[0]
+        self.assertEqual((row["name"], row["company_name"]), ("Old", ""))
+        old.close()
+
     def test_rent_and_receipt(self):
         self.s.save_resident(resident())
         rid = self.s.list_residents()[0]["id"]
