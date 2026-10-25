@@ -1,4 +1,5 @@
 """Tkinter/ttk user interface."""
+import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
@@ -203,6 +204,14 @@ class ResidentsTab(Tab):
         ttk.Label(box, text="Free bed").grid(row=1, column=2, sticky="e")
         self.bed_cb = ttk.Combobox(box, textvariable=self.bed, state="readonly", width=10)
         self.bed_cb.grid(row=1, column=3, sticky="w")
+        self.photo_source = ""
+        self.stored_photo = ""
+        self.photo_status = tk.StringVar(value="No photo")
+        photo = ttk.Frame(box)
+        photo.grid(row=2, column=2, columnspan=2, rowspan=4, sticky="nw", padx=4)
+        ttk.Button(photo, text="Choose photo…", command=self.choose_photo).pack(anchor="w")
+        ttk.Button(photo, text="Remove photo", command=self.remove_photo).pack(anchor="w", pady=2)
+        ttk.Label(photo, textvariable=self.photo_status, wraplength=180).pack(anchor="w")
         bar = ttk.Frame(box)
         bar.grid(row=len(self.FIELDS), column=0, columnspan=4)
         self.buttons(bar, [("Save new", self.save_new), ("Update selected", self.update),
@@ -216,8 +225,37 @@ class ResidentsTab(Tab):
         if self.bed.get() and int(self.bed.get() or 0) not in beds:
             self.bed.set("")
 
+    def show_photo_status(self):
+        if self.photo_source:
+            self.photo_status.set(f"Selected: {os.path.basename(self.photo_source)} (saved on Save/Update)")
+        elif self.stored_photo:
+            self.photo_status.set(f"Stored: {os.path.basename(self.stored_photo)}")
+        else:
+            self.photo_status.set("No photo")
+
+    def choose_photo(self):
+        exts = " ".join("*" + e for e in services.PHOTO_EXTENSIONS)
+        path = filedialog.askopenfilename(title="Choose resident photo",
+                                          filetypes=[("Image files", exts), ("All files", "*.*")])
+        if path:
+            self.photo_source = path
+            self.show_photo_status()
+
+    @guard
+    def remove_photo(self):
+        if self.photo_source:
+            self.photo_source = ""
+        elif self.stored_photo and self.editing:
+            if not messagebox.askyesno("Remove photo", "Permanently delete this resident's stored photo?"):
+                return
+            self.svc.clear_resident_photo(self.editing)
+            self.stored_photo = ""
+            self.app.refresh_all()
+        self.show_photo_status()
+
     def collect(self):
         d = {k: v.get() for k, v in self.v.items()}
+        d["photo_source"] = self.photo_source
         d["room_id"] = self.room_map.get(self.room.get())
         d["bed_no"] = self.bed.get()
         return d
@@ -232,6 +270,9 @@ class ResidentsTab(Tab):
         self.room.set(r["room_no"] or "")
         self.update_beds()
         self.bed.set(r["bed_no"] or "")
+        self.photo_source = ""
+        self.stored_photo = r.get("photo_path") or ""
+        self.show_photo_status()
 
     def clear(self):
         self.editing = None
@@ -240,6 +281,9 @@ class ResidentsTab(Tab):
         self.v["join_date"].set(today_str())
         self.room.set("")
         self.bed.set("")
+        self.photo_source = ""
+        self.stored_photo = ""
+        self.show_photo_status()
         self.update_beds()
 
     @guard
@@ -253,6 +297,9 @@ class ResidentsTab(Tab):
         if not self.editing:
             raise ValidationError("Select an active resident in the list to update.")
         self.svc.save_resident(self.collect(), self.editing)
+        self.photo_source = ""
+        self.stored_photo = (self.svc.get_resident(self.editing) or {}).get("photo_path") or ""
+        self.show_photo_status()
         self.app.refresh_all()
 
     @guard
