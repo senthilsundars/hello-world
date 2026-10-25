@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+build/
+dist/
+*.spec
+*.egg-info/
+# Local data, backups and generated output
+*.db
+*.sqlite
+*.sqlite3
+hostel_backup_*
+receipts/
+exports/
+backups/
