@@ -31,6 +31,9 @@ def data_dir():
     return path
 
 
+PHOTO_DIR_NAME = "resident_photos"
+
+
 def db_path():
     return data_dir() / DB_NAME
 
@@ -48,7 +51,7 @@ CREATE TABLE IF NOT EXISTS residents (
     emergency_name TEXT NOT NULL, emergency_phone TEXT NOT NULL,
     join_date TEXT NOT NULL, monthly_rent REAL NOT NULL, deposit REAL NOT NULL DEFAULT 0,
     room_id INTEGER REFERENCES rooms(id), bed_no INTEGER,
-    status TEXT NOT NULL DEFAULT 'Active', checkout_date TEXT,
+    status TEXT NOT NULL DEFAULT 'Active', checkout_date TEXT, photo_path TEXT,
     company_name TEXT NOT NULL DEFAULT '', company_address TEXT NOT NULL DEFAULT '');
 CREATE UNIQUE INDEX IF NOT EXISTS ux_active_bed
     ON residents(room_id, bed_no) WHERE status = 'Active';
@@ -113,6 +116,9 @@ def init_db(conn):
     """Create tables and seed default admin and 30 rooms on first run."""
     conn.executescript(SCHEMA)
     migrate(conn)
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(residents)")}
+    if "photo_path" not in columns:
+        conn.execute("ALTER TABLE residents ADD COLUMN photo_path TEXT")
     if conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
         set_password(conn, DEFAULT_USERNAME, DEFAULT_PASSWORD)
     if conn.execute("SELECT COUNT(*) FROM rooms").fetchone()[0] == 0:

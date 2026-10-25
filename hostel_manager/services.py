@@ -1,7 +1,10 @@
 """Business logic on top of SQLite. Raises ValidationError with friendly messages."""
 import csv
+import shutil
 import sqlite3
+import uuid
 from datetime import date
+from pathlib import Path
 
 from . import db
 from .utils import (ValidationError, current_month, month_range, now_str, optional_phone,
@@ -12,12 +15,79 @@ PAYMENT_METHODS = ("Cash", "UPI", "Bank")
 MAINT_STATUSES = ("Open", "In Progress", "Completed")
 MAINT_CATEGORIES = ("Electrical", "Plumbing", "Cleaning", "Furniture", "Fan/AC", "Other")
 EXPENSE_CATEGORIES = ("Electricity", "Water", "Groceries", "Salaries", "Repairs", "Miscellaneous")
+PHOTO_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".bmp")
 ID_PROOFS = ("Aadhaar", "Driving Licence", "Voter ID", "PAN", "Passport", "College/Office ID", "Other")
 
 
 class Service:
-    def __init__(self, conn):
+    def __init__(self, conn, data_folder=None):
         self.conn = conn
+        self.data_folder = Path(data_folder) if data_folder else self._db_folder(conn)
+
+    @staticmethod
+    def _db_folder(conn):
+        for row in conn.execute("PRAGMA database_list"):
+            if row[1] == "main" and row[2]:
+                return Path(row[2]).resolve().parent
+        return db.data_dir()
+
+    # ---- resident photos ----
+    @property
+    def photo_dir(self):
+        return self.data_folder / db.PHOTO_DIR_NAME
+
+    @staticmethod
+    def validate_photo_source(source):
+        """Return the Path of a usable image file or raise ValidationError."""
+        source = Path(str(source).strip())
+        if source.suffix.lower() not in PHOTO_EXTENSIONS:
+            raise ValidationError("Photo must be an image file (" + ", ".join(PHOTO_EXTENSIONS) + ").")
+        if not source.is_file():
+            raise ValidationError(f"Photo file was not found: {source.name}")
+        return source
+
+    def store_photo(self, source):
+        """Copy an image into the photo folder under a unique name; returns the relative path."""
+        source = self.validate_photo_source(source)
+        self.photo_dir.mkdir(parents=True, exist_ok=True)
+        while True:
+            name = f"resident_{uuid.uuid4().hex}{source.suffix.lower()}"
+            target = self.photo_dir / name
+            if not target.exists():
+                break
+        try:
+            with open(source, "rb") as src, open(target, "xb") as dst:
+                shutil.copyfileobj(src, dst)
+        except OSError as exc:
+            raise ValidationError(f"Could not save the photo: {exc.strerror or exc}")
+        return f"{db.PHOTO_DIR_NAME}/{name}"
+
+    def photo_file(self, rel_path):
+        """Absolute path of a stored photo, or None if it is empty or outside the photo folder."""
+        if not rel_path:
+            return None
+        path = (self.data_folder / rel_path).resolve()
+        if path.parent != self.photo_dir.resolve():
+            return None
+        return path
+
+    def delete_photo_file(self, rel_path):
+        path = self.photo_file(rel_path)
+        if path and path.is_file():
+            try:
+                path.unlink()
+            except OSError:
+                pass
+
+    def clear_resident_photo(self, resident_id):
+        res = self.get_resident(resident_id)
+        if not res:
+            raise ValidationError("Resident not found.")
+        if res["status"] != "Active":
+            raise ValidationError("Checked-out residents cannot be edited.")
+        self.conn.execute("UPDATE residents SET photo_path=NULL WHERE id=?", (resident_id,))
+        self.conn.commit()
+        self.delete_photo_file(res.get("photo_path"))
 
     def _all(self, sql, params=()):
         return [dict(r) for r in self.conn.execute(sql, params).fetchall()]
@@ -140,15 +210,27 @@ class Service:
         if bed_no not in self.free_beds(room_id, resident_id):
             raise ValidationError(f"Bed {bed_no} in room {room['room_no']} is already occupied.")
         clean.update(room_id=room_id, bed_no=bed_no)
+        new_photo = None
+        if (data.get("photo_source") or "").strip():
+            new_photo = self.store_photo(data["photo_source"])
+            clean["photo_path"] = new_photo
         cols = list(clean)
-        if resident_id:
-            self.conn.execute(f"UPDATE residents SET {', '.join(c + '=?' for c in cols)} WHERE id=?",
-                              [clean[c] for c in cols] + [resident_id])
-        else:
-            self.conn.execute(
-                f"INSERT INTO residents({', '.join(cols)}, status) VALUES ({', '.join('?' * len(cols))}, 'Active')",
-                [clean[c] for c in cols])
-        self.conn.commit()
+        try:
+            if resident_id:
+                self.conn.execute(f"UPDATE residents SET {', '.join(c + '=?' for c in cols)} WHERE id=?",
+                                  [clean[c] for c in cols] + [resident_id])
+            else:
+                self.conn.execute(
+                    f"INSERT INTO residents({', '.join(cols)}, status) VALUES ({', '.join('?' * len(cols))}, 'Active')",
+                    [clean[c] for c in cols])
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            if new_photo:
+                self.delete_photo_file(new_photo)
+            raise
+        if new_photo and resident_id and existing.get("photo_path"):
+            self.delete_photo_file(existing["photo_path"])
 
     def checkout_resident(self, resident_id, checkout_date=None):
         res = self.get_resident(resident_id)
