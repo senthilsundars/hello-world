@@ -15,6 +15,89 @@ def resident(**kw):
     return d
 
 
+class ResidentPhotoTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.conn = db.connect(self.root / "t.db")
+        db.init_db(self.conn)
+        self.s = Service(self.conn, self.root)
+
+    def tearDown(self):
+        self.conn.close()
+        self.tmp.cleanup()
+
+    def image(self, name="face.png", data=b"img"):
+        path = self.root / name
+        path.write_bytes(data)
+        return str(path)
+
+    def add(self, **kw):
+        self.s.save_resident(resident(**kw))
+        return self.s.list_residents()[0]
+
+    def test_upload_copies_photo(self):
+        src = self.image()
+        r = self.add(photo_source=src)
+        stored = self.s.photo_file(r["photo_path"])
+        self.assertTrue(r["photo_path"].startswith("resident_photos/"))
+        self.assertEqual(stored.read_bytes(), b"img")
+        self.assertNotEqual(stored, Path(src))
+        Path(src).unlink()
+        self.assertTrue(stored.is_file())
+
+    def test_unique_names_no_overwrite(self):
+        src = self.image()
+        a = self.add(photo_source=src)
+        self.s.save_resident(resident(name="B", bed_no=2, photo_source=src))
+        paths = {x["photo_path"] for x in self.s.list_residents()}
+        self.assertEqual(len(paths), 2)
+        self.assertEqual(a["photo_path"] in paths, True)
+
+    def test_edit_retains_and_replaces_photo(self):
+        r = self.add(photo_source=self.image())
+        old = self.s.photo_file(r["photo_path"])
+        self.s.save_resident(resident(name="Renamed"), r["id"])
+        kept = self.s.get_resident(r["id"])
+        self.assertEqual(kept["photo_path"], r["photo_path"])
+        self.assertTrue(old.is_file())
+        self.s.save_resident(resident(photo_source=self.image("new.jpg", b"new")), r["id"])
+        new = self.s.get_resident(r["id"])
+        self.assertNotEqual(new["photo_path"], r["photo_path"])
+        self.assertFalse(old.exists())
+        self.assertEqual(self.s.photo_file(new["photo_path"]).read_bytes(), b"new")
+
+    def test_clear_removes_file_checkout_keeps(self):
+        r = self.add(photo_source=self.image())
+        stored = self.s.photo_file(r["photo_path"])
+        self.s.checkout_resident(r["id"])
+        self.assertTrue(stored.is_file())
+        self.assertEqual(self.s.get_resident(r["id"])["photo_path"], r["photo_path"])
+        self.s.save_resident(resident(name="C", bed_no=2, photo_source=self.image("c.png")))
+        c = [x for x in self.s.list_residents("Active")][0]
+        cstored = self.s.photo_file(c["photo_path"])
+        self.s.clear_resident_photo(c["id"])
+        self.assertFalse(cstored.exists())
+        self.assertIsNone(self.s.get_resident(c["id"])["photo_path"])
+
+    def test_invalid_input(self):
+        with self.assertRaises(ValidationError):
+            self.s.save_resident(resident(photo_source=str(self.root / "missing.png")))
+        with self.assertRaises(ValidationError):
+            self.s.save_resident(resident(photo_source=self.image("doc.txt")))
+        self.assertEqual(self.s.list_residents(), [])
+        self.assertFalse(self.s.photo_dir.exists() and any(self.s.photo_dir.iterdir()))
+
+    def test_upgrade_existing_database(self):
+        old = db.connect(self.root / "old.db")
+        old.executescript(db.SCHEMA.replace(", photo_path TEXT", ""))
+        self.assertNotIn("photo_path", [r[1] for r in old.execute("PRAGMA table_info(residents)")])
+        db.init_db(old)
+        db.init_db(old)
+        self.assertIn("photo_path", [r[1] for r in old.execute("PRAGMA table_info(residents)")])
+        old.close()
+
+
 class ServiceTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
