@@ -51,7 +51,8 @@ CREATE TABLE IF NOT EXISTS residents (
     emergency_name TEXT NOT NULL, emergency_phone TEXT NOT NULL,
     join_date TEXT NOT NULL, monthly_rent REAL NOT NULL, deposit REAL NOT NULL DEFAULT 0,
     room_id INTEGER REFERENCES rooms(id), bed_no INTEGER,
-    status TEXT NOT NULL DEFAULT 'Active', checkout_date TEXT, photo_path TEXT);
+    status TEXT NOT NULL DEFAULT 'Active', checkout_date TEXT, photo_path TEXT,
+    company_name TEXT NOT NULL DEFAULT '', company_address TEXT NOT NULL DEFAULT '');
 CREATE UNIQUE INDEX IF NOT EXISTS ux_active_bed
     ON residents(room_id, bed_no) WHERE status = 'Active';
 CREATE TABLE IF NOT EXISTS payments (
@@ -100,9 +101,21 @@ def connect(path=None):
     return conn
 
 
+OPTIONAL_RESIDENT_COLUMNS = ("company_name", "company_address")
+
+
+def migrate(conn):
+    """Add columns introduced after the first release to existing databases."""
+    have = {r["name"] for r in conn.execute("PRAGMA table_info(residents)")}
+    for col in OPTIONAL_RESIDENT_COLUMNS:
+        if col not in have:
+            conn.execute(f"ALTER TABLE residents ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
+
+
 def init_db(conn):
     """Create tables and seed default admin and 30 rooms on first run."""
     conn.executescript(SCHEMA)
+    migrate(conn)
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(residents)")}
     if "photo_path" not in columns:
         conn.execute("ALTER TABLE residents ADD COLUMN photo_path TEXT")

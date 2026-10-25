@@ -171,7 +171,9 @@ class ResidentsTab(Tab):
               ("id_proof_type", "ID proof type", "combo", services.ID_PROOFS),
               ("id_proof_number", "ID proof number", "entry"), ("emergency_name", "Emergency contact", "entry"),
               ("emergency_phone", "Emergency phone", "entry"), ("join_date", "Join date (YYYY-MM-DD)", "entry"),
-              ("monthly_rent", "Monthly rent", "entry"), ("deposit", "Advance / deposit", "entry")]
+              ("monthly_rent", "Monthly rent", "entry"), ("deposit", "Advance / deposit", "entry"),
+              ("company_name", "Working / company name (optional)", "entry"),
+              ("company_address", "Company address (optional)", "entry")]
 
     def __init__(self, *a):
         super().__init__(*a)
@@ -184,7 +186,8 @@ class ResidentsTab(Tab):
                           state="readonly")
         cb.pack(side="left", padx=4)
         cb.bind("<<ComboboxSelected>>", lambda _: self.refresh())
-        self.table = Table(self, [("name", "Name", 140), ("phone", "Phone", 100), ("room_no", "Room", 60),
+        self.table = Table(self, [("name", "Name", 140), ("phone", "Phone", 100),
+                                  ("company_name", "Company", 130), ("room_no", "Room", 60),
                                   ("bed_no", "Bed", 40), ("join_date", "Joined", 90),
                                   ("monthly_rent", "Rent", 80), ("deposit", "Deposit", 80),
                                   ("status", "Status", 90), ("checkout_date", "Checked out", 90)],
